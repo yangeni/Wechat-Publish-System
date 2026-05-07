@@ -1,4 +1,4 @@
-import { relative, sep } from "node:path";
+import { relative } from "node:path";
 import type { AssetUploadMapEntry, PublishBundle } from "../domain/types.js";
 import { sha256File } from "../domain/hash.js";
 
@@ -13,11 +13,12 @@ export interface UploadAssetsResult {
   assetMap: AssetUploadMapEntry[];
 }
 
+export function normalizeBundleUrlPath(relativePath: string): string {
+  return relativePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
 export function toBundleUrlPath(bundleRoot: string, assetPath: string): string {
-  return relative(bundleRoot, assetPath)
-    .split(sep)
-    .join("/")
-    .replace(/^\.\//, "");
+  return normalizeBundleUrlPath(relative(bundleRoot, assetPath));
 }
 
 export async function uploadAssets(input: {

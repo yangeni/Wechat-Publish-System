@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { basename, join } from "node:path";
-import { uploadAssets } from "../src/upload/asset-uploader.js";
+import { normalizeBundleUrlPath, uploadAssets } from "../src/upload/asset-uploader.js";
 import { buildDraftPayload } from "../src/publish/runner.js";
 import { readBundle } from "../src/bundle/bundle.js";
 
 describe("asset upload and draft payload", () => {
+  it("normalizes bundle asset keys to url-style paths", () => {
+    expect(normalizeBundleUrlPath("assets\\body.png")).toBe("assets/body.png");
+    expect(normalizeBundleUrlPath(".\\assets\\body.png")).toBe("assets/body.png");
+    expect(normalizeBundleUrlPath("./assets/body.png")).toBe("assets/body.png");
+  });
+
   it("uploads cover as media id and body assets as urls", async () => {
     const root = join(process.cwd(), "tests/fixtures/sample-bundle");
     const bundle = await readBundle(root);
