@@ -7,10 +7,10 @@
     "publish-wechat": "./bin/publish-wechat.mjs"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
@@ -21,5 +21,8 @@
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vitest": "^3.0.8"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }
