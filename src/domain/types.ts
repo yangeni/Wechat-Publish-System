@@ -8,6 +8,10 @@ export interface PublishBundle {
   title: string;
   author: string;
   digest: string;
+  articleHtmlBundlePath: string;
+  articleMarkdownBundlePath: string;
+  coverBundlePath: string;
+  assetBundlePaths: string[];
   articleHtmlPath: string;
   articleMarkdownPath: string;
   coverPath: string;

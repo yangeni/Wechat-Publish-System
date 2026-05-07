@@ -10,6 +10,9 @@ describe("readBundle", () => {
     const bundle = await readBundle(root);
     expect(bundle.jobId).toBe("JOB-001");
     expect(bundle.platform).toBe("wechat");
+    expect(bundle.articleHtmlBundlePath).toBe("article.html");
+    expect(bundle.coverBundlePath).toBe("cover/cover.png");
+    expect(bundle.assetBundlePaths).toEqual(["assets/body.png"]);
     expect(bundle.articleHtmlPath).toBe(join(root, "article.html"));
     expect(bundle.coverPath).toBe(join(root, "cover/cover.png"));
     expect(bundle.assetPaths).toEqual([join(root, "assets/body.png")]);

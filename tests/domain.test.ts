@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIdempotencyKey, hashFiles } from "../src/domain/hash.js";
+import { buildIdempotencyKey, hashFiles, hashPackage } from "../src/domain/hash.js";
 import { classifyWechatError } from "../src/domain/errors.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -35,13 +35,19 @@ describe("domain helpers", () => {
     const b = join(root, "b.txt");
     await writeFile(a, "alpha");
     await writeFile(b, "beta");
-    const first = await hashFiles([b, a]);
-    const second = await hashFiles([a, b]);
+    const first = await hashFiles([
+      { logicalPath: "b.txt", filePath: b },
+      { logicalPath: "a.txt", filePath: a }
+    ]);
+    const second = await hashFiles([
+      { logicalPath: "a.txt", filePath: a },
+      { logicalPath: "b.txt", filePath: b }
+    ]);
     expect(first).toBe(second);
     expect(first).toHaveLength(64);
   });
 
-  it("hashes identical file contents the same under different paths", async () => {
+  it("binds file hashes to logical paths", async () => {
     const root = join(tmpdir(), `wechat-publisher-paths-${Date.now()}`);
     const firstRoot = join(root, "first");
     const secondRoot = join(root, "second");
@@ -57,6 +63,30 @@ describe("domain helpers", () => {
     await writeFile(secondA, "alpha");
     await writeFile(secondB, "beta");
 
-    expect(await hashFiles([firstA, firstB])).toBe(await hashFiles([secondB, secondA]));
+    expect(await hashFiles([
+      { logicalPath: "a.txt", filePath: firstA },
+      { logicalPath: "b.txt", filePath: firstB }
+    ])).not.toBe(await hashFiles([
+      { logicalPath: "copied-b.txt", filePath: secondB },
+      { logicalPath: "copied-a.txt", filePath: secondA }
+    ]));
+  });
+
+  it("changes package hash when metadata changes", async () => {
+    const root = join(tmpdir(), `wechat-publisher-metadata-${Date.now()}`);
+    await mkdir(root, { recursive: true });
+    const article = join(root, "article.html");
+    await writeFile(article, "<article>body</article>");
+
+    const first = await hashPackage({
+      metadata: { title: "First", digest: "Digest" },
+      files: [{ logicalPath: "article.html", filePath: article }]
+    });
+    const second = await hashPackage({
+      metadata: { title: "Second", digest: "Digest" },
+      files: [{ logicalPath: "article.html", filePath: article }]
+    });
+
+    expect(first).not.toBe(second);
   });
 });

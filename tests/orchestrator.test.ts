@@ -107,6 +107,32 @@ describe("runPublishJob", () => {
     expect(secondCalls).toEqual([]);
   });
 
+  it("creates a new draft when publish metadata changes", async () => {
+    const root = await runtimeRoot();
+    const bundleRoot = await copiedBundleRoot();
+    const first = await runPublishJob({
+      bundleRoot,
+      runtimeRoot: root,
+      profile: profile(),
+      client: client()
+    });
+
+    const raw = JSON.parse(await readFile(join(bundleRoot, "bundle.json"), "utf8"));
+    raw.title = "Updated title";
+    await writeFile(join(bundleRoot, "bundle.json"), JSON.stringify(raw), "utf8");
+
+    const calls: string[] = [];
+    const second = await runPublishJob({
+      bundleRoot,
+      runtimeRoot: root,
+      profile: profile(),
+      client: client(calls)
+    });
+
+    expect(second.packageHash).not.toBe(first.packageHash);
+    expect(calls).toEqual(["uploadPermanentImage", "uploadArticleImage", "addDraft"]);
+  });
+
   it("writes a blocked ledger when sanitized content has blockers", async () => {
     const root = await runtimeRoot();
     const bundleRoot = await copiedBundleRoot();

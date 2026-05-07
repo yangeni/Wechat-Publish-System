@@ -39,6 +39,10 @@ async function resolveBundlePath(realBundleRoot: string, bundlePath: string): Pr
   return realPath;
 }
 
+function normalizeBundlePath(bundlePath: string): string {
+  return bundlePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
 function isPathInsideRoot(relativePath: string): boolean {
   return relativePath === "" || (relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
 }
@@ -53,6 +57,10 @@ export async function readBundle(bundleRoot: string): Promise<PublishBundle> {
     title: parsed.title,
     author: parsed.author,
     digest: parsed.digest,
+    articleHtmlBundlePath: normalizeBundlePath(parsed.article_html),
+    articleMarkdownBundlePath: normalizeBundlePath(parsed.article_md),
+    coverBundlePath: normalizeBundlePath(parsed.cover_path),
+    assetBundlePaths: parsed.asset_paths.map(normalizeBundlePath),
     articleHtmlPath: await resolveBundlePath(resolvedBundleRoot, parsed.article_html),
     articleMarkdownPath: await resolveBundlePath(resolvedBundleRoot, parsed.article_md),
     coverPath: await resolveBundlePath(resolvedBundleRoot, parsed.cover_path),

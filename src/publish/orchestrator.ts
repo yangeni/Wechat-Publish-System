@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { readBundle } from "../bundle/bundle.js";
 import { sanitizeWechatHtml } from "../content/sanitizer.js";
-import { buildIdempotencyKey, hashFiles } from "../domain/hash.js";
+import { buildIdempotencyKey, hashPackage } from "../domain/hash.js";
 import type { AssetUploadMapEntry, PublishLedger, PublishProfile } from "../domain/types.js";
 import { createLedgerPaths, existingLedgerForKey, writeLedger } from "../ledger/ledger.js";
 import { uploadAssets, type UploadClient } from "../upload/asset-uploader.js";
@@ -29,12 +29,29 @@ export async function runPublishJob(input: RunPublishJobInput): Promise<PublishL
   if (input.expectedJobId && bundle.jobId !== input.expectedJobId) {
     throw new Error(`Bundle job_id (${bundle.jobId}) does not match requested job (${input.expectedJobId})`);
   }
-  const packageHash = await hashFiles([
-    bundle.articleHtmlPath,
-    bundle.articleMarkdownPath,
-    bundle.coverPath,
-    ...bundle.assetPaths
-  ]);
+  const packageHash = await hashPackage({
+    metadata: {
+      title: bundle.title,
+      author: bundle.author,
+      digest: bundle.digest,
+      source_bundle_hash: bundle.sourceBundleHash,
+      platform: bundle.platform,
+      publish_mode: bundle.publishMode,
+      article_html: bundle.articleHtmlBundlePath,
+      article_md: bundle.articleMarkdownBundlePath,
+      cover_path: bundle.coverBundlePath,
+      asset_paths: bundle.assetBundlePaths
+    },
+    files: [
+      { logicalPath: `article_html:${bundle.articleHtmlBundlePath}`, filePath: bundle.articleHtmlPath },
+      { logicalPath: `article_md:${bundle.articleMarkdownBundlePath}`, filePath: bundle.articleMarkdownPath },
+      { logicalPath: `cover:${bundle.coverBundlePath}`, filePath: bundle.coverPath },
+      ...bundle.assetPaths.map((assetPath, index) => ({
+        logicalPath: `asset:${bundle.assetBundlePaths[index]}`,
+        filePath: assetPath
+      }))
+    ]
+  });
   const idempotencyKey = buildIdempotencyKey({
     objectId: bundle.objectId,
     packageHash,
