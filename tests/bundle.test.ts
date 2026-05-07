@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { readBundle } from "../src/bundle/bundle.js";
@@ -57,5 +57,29 @@ describe("readBundle", () => {
     );
 
     await expect(readBundle(root)).rejects.toThrow("resolves outside bundle root");
+  });
+
+  it("allows bundle paths whose directory name only starts with dots", async () => {
+    const root = await mkdtemp(join(tmpdir(), "wechat-bundle-"));
+    await writeFile(join(root, "article.md"), "# Body", "utf8");
+    await writeFile(join(root, "cover.png"), "cover", "utf8");
+    await writeFile(join(root, "..foo.html"), "<article>body</article>", "utf8");
+    await writeFile(
+      join(root, "bundle.json"),
+      JSON.stringify({
+        job_id: "JOB-004",
+        object_id: "DRPUB-029",
+        title: "Dot prefix bundle",
+        article_html: "..foo.html",
+        article_md: "article.md",
+        cover_path: "cover.png",
+        asset_paths: [],
+        platform: "wechat"
+      }),
+      "utf8"
+    );
+
+    const bundle = await readBundle(root);
+    expect(basename(bundle.articleHtmlPath)).toBe("..foo.html");
   });
 });

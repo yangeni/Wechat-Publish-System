@@ -1,5 +1,5 @@
 import { readFile, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import type { PublishBundle } from "../domain/types.js";
 
@@ -40,7 +40,7 @@ async function resolveBundlePath(realBundleRoot: string, bundlePath: string): Pr
 }
 
 function isPathInsideRoot(relativePath: string): boolean {
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+  return relativePath === "" || (relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
 }
 
 export async function readBundle(bundleRoot: string): Promise<PublishBundle> {
