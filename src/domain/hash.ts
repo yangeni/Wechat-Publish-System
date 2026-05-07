@@ -8,10 +8,9 @@ export async function sha256File(filePath: string): Promise<string> {
 
 export async function hashFiles(filePaths: string[]): Promise<string> {
   const hash = createHash("sha256");
-  for (const filePath of [...filePaths].sort()) {
-    hash.update(filePath);
-    hash.update("\0");
-    hash.update(await readFile(filePath));
+  const contentDigests = await Promise.all(filePaths.map(sha256File));
+  for (const digest of contentDigests.sort()) {
+    hash.update(digest);
     hash.update("\0");
   }
   return hash.digest("hex");

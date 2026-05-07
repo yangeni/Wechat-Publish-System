@@ -5,8 +5,9 @@ const CONTENT_CODES = new Set([40005, 40007, 40009, 53503, 53504, 53505]);
 const RETRYABLE_CODES = new Set([-1, 45009, 50001]);
 
 export function classifyWechatError(error: WechatApiErrorLike): ClassifiedError {
-  const errcode = error.errcode ?? 0;
   const errmsg = error.errmsg ?? "";
+  const errcode = error.errcode;
+  if (errcode === undefined) return { kind: "UNKNOWN", retryable: false, errmsg };
   if (errcode === 0) return { kind: "OK", retryable: false, errcode, errmsg };
   if (AUTH_CODES.has(errcode)) return { kind: "BLOCKED_AUTH", retryable: false, errcode, errmsg };
   if (CONTENT_CODES.has(errcode)) return { kind: "BLOCKED_CONTENT", retryable: false, errcode, errmsg };

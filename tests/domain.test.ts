@@ -20,6 +20,14 @@ describe("domain helpers", () => {
     expect(classifyWechatError({ errcode: 0, errmsg: "ok" }).kind).toBe("OK");
   });
 
+  it("does not treat malformed responses as successful", () => {
+    expect(classifyWechatError({ errmsg: "bad gateway" })).toEqual({
+      kind: "UNKNOWN",
+      retryable: false,
+      errmsg: "bad gateway"
+    });
+  });
+
   it("hashes files in a deterministic order", async () => {
     const root = join(tmpdir(), `wechat-publisher-${Date.now()}`);
     await mkdir(root, { recursive: true });
@@ -31,5 +39,24 @@ describe("domain helpers", () => {
     const second = await hashFiles([a, b]);
     expect(first).toBe(second);
     expect(first).toHaveLength(64);
+  });
+
+  it("hashes identical file contents the same under different paths", async () => {
+    const root = join(tmpdir(), `wechat-publisher-paths-${Date.now()}`);
+    const firstRoot = join(root, "first");
+    const secondRoot = join(root, "second");
+    await mkdir(firstRoot, { recursive: true });
+    await mkdir(secondRoot, { recursive: true });
+
+    const firstA = join(firstRoot, "a.txt");
+    const firstB = join(firstRoot, "b.txt");
+    const secondA = join(secondRoot, "copied-a.txt");
+    const secondB = join(secondRoot, "copied-b.txt");
+    await writeFile(firstA, "alpha");
+    await writeFile(firstB, "beta");
+    await writeFile(secondA, "alpha");
+    await writeFile(secondB, "beta");
+
+    expect(await hashFiles([firstA, firstB])).toBe(await hashFiles([secondB, secondA]));
   });
 });
