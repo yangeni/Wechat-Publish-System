@@ -2,6 +2,8 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PublishLedger } from "../domain/types.js";
 
+const ledgerStatuses = new Set(["draft_saved", "published", "blocked", "failed"]);
+
 export interface LedgerPaths {
   jobDir: string;
   ledgerJson: string;
@@ -13,6 +15,7 @@ export interface LedgerPaths {
 }
 
 export function createLedgerPaths(runtimeRoot: string, jobId: string): LedgerPaths {
+  assertSafeJobId(jobId);
   const jobDir = join(runtimeRoot, "publish-jobs", jobId);
   return {
     jobDir,
@@ -40,16 +43,49 @@ export async function existingLedgerForKey(runtimeRoot: string, idempotencyKey: 
   } catch {
     return undefined;
   }
+  const matches: PublishLedger[] = [];
   for (const entry of entries) {
     try {
       const raw = await readFile(join(jobsRoot, entry, "publish-ledger.json"), "utf8");
-      const parsed = JSON.parse(raw) as PublishLedger;
-      if (parsed.idempotencyKey === idempotencyKey) return parsed;
+      const parsed: unknown = JSON.parse(raw);
+      if (isPublishLedger(parsed) && parsed.idempotencyKey === idempotencyKey) matches.push(parsed);
     } catch {
       continue;
     }
   }
-  return undefined;
+  matches.sort((a, b) => {
+    const timestampOrder = ledgerTimestamp(b).localeCompare(ledgerTimestamp(a));
+    if (timestampOrder !== 0) return timestampOrder;
+    return b.jobId.localeCompare(a.jobId);
+  });
+  return matches[0];
+}
+
+function assertSafeJobId(jobId: string): void {
+  if (jobId.trim() === "" || jobId.includes("/") || jobId.includes("\\") || jobId.includes("..")) {
+    throw new Error(`Unsafe ledger job id: ${jobId}`);
+  }
+}
+
+function isPublishLedger(value: unknown): value is PublishLedger {
+  if (!isRecord(value)) return false;
+  return typeof value.jobId === "string"
+    && typeof value.objectId === "string"
+    && typeof value.accountProfile === "string"
+    && typeof value.packageHash === "string"
+    && typeof value.idempotencyKey === "string"
+    && typeof value.startedAt === "string"
+    && typeof value.status === "string"
+    && ledgerStatuses.has(value.status)
+    && Array.isArray(value.assetMap);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function ledgerTimestamp(ledger: PublishLedger): string {
+  return ledger.finishedAt ?? ledger.startedAt;
 }
 
 function renderReport(ledger: PublishLedger): string {
