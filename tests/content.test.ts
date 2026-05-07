@@ -29,4 +29,33 @@ describe("sanitizeWechatHtml", () => {
     expect(result.blockers).toContain("internal_term:Gate");
     expect(result.blockers).toContain("internal_term:runtime/objects");
   });
+
+  it("removes executable URL and event handler attributes", () => {
+    const result = sanitizeWechatHtml({
+      html: '<article><a href="javascript:alert(1)">bad</a><img src="assets/body.png" onerror="alert(1)"></article>',
+      imageUrlMap: new Map([["assets/body.png", "https://mmbiz.qpic.cn/body"]])
+    });
+    expect(result.blockers).toContain("unsafe_url:href:javascript:alert(1)");
+    expect(result.blockers).toContain("event_handler:onerror");
+    expect(result.html).not.toContain("javascript:");
+    expect(result.html).not.toContain("onerror=");
+  });
+
+  it("does not block Gate inside normal prose words", () => {
+    const result = sanitizeWechatHtml({
+      html: "<article><p>Bill Gates wrote about the gateway market.</p></article>",
+      imageUrlMap: new Map()
+    });
+    expect(result.blockers).not.toContain("internal_term:Gate");
+  });
+
+  it("preserves sanitized article fragment shape", () => {
+    const result = sanitizeWechatHtml({
+      html: '<article><p>Hello</p><img src="assets/body.png"></article>',
+      imageUrlMap: new Map([["assets/body.png", "https://mmbiz.qpic.cn/body"]])
+    });
+    expect(result.html).toMatch(/^<article/);
+    expect(result.html).not.toContain("<html");
+    expect(result.html).not.toContain("<body");
+  });
 });

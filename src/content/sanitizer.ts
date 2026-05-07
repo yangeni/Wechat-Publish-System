@@ -16,9 +16,19 @@ function isLocalAbsolutePath(value: string): boolean {
   return value.startsWith("/") || value.startsWith("file://");
 }
 
+function isUnsafeUrl(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("javascript:") || normalized.startsWith("data:");
+}
+
+function containsInternalTerm(text: string, term: string): boolean {
+  if (term === "Gate") return /(^|[^A-Za-z])Gate([^A-Za-z]|$)/.test(text);
+  return text.includes(term);
+}
+
 export function sanitizeWechatHtml(input: SanitizerInput): SanitizerResult {
   const blockers: string[] = [];
-  const $ = cheerio.load(input.html, { xmlMode: false });
+  const $ = cheerio.load(input.html, { xmlMode: false }, false);
 
   if ($("script").length > 0) blockers.push("script_tag_present");
   $("script").remove();
@@ -28,8 +38,25 @@ export function sanitizeWechatHtml(input: SanitizerInput): SanitizerResult {
 
   const plainText = $.root().text();
   for (const term of INTERNAL_TERMS) {
-    if (plainText.includes(term)) blockers.push(`internal_term:${term}`);
+    if (containsInternalTerm(plainText, term)) blockers.push(`internal_term:${term}`);
   }
+
+  $("*").each((_, element) => {
+    const attributes = $(element).attr();
+    for (const attribute of Object.keys(attributes ?? {})) {
+      const value = $(element).attr(attribute) ?? "";
+      const normalizedAttribute = attribute.toLowerCase();
+      if (normalizedAttribute.startsWith("on")) {
+        blockers.push(`event_handler:${attribute}`);
+        $(element).removeAttr(attribute);
+        continue;
+      }
+      if ((normalizedAttribute === "href" || normalizedAttribute === "src") && isUnsafeUrl(value)) {
+        blockers.push(`unsafe_url:${attribute}:${value}`);
+        $(element).removeAttr(attribute);
+      }
+    }
+  });
 
   $("img").each((_, element) => {
     const current = $(element).attr("src") ?? "";
