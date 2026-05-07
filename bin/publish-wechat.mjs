@@ -1,17 +1,10 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { FetchHttpClient } from "../dist/src/wechat/http.js";
 import { WechatClient } from "../dist/src/wechat/client.js";
 import { loadProfile } from "../dist/src/profile/profile.js";
 import { runPublishJob } from "../dist/src/publish/orchestrator.js";
-
-function argValue(name, fallback) {
-  const index = process.argv.indexOf(name);
-  if (index < 0) return fallback;
-  const value = process.argv[index + 1];
-  return value && !value.startsWith("--") ? value : fallback;
-}
+import { CliInputError, parseCliOptions } from "../dist/src/publish/cli-options.js";
 
 async function readProfileJson(profilePath) {
   try {
@@ -22,44 +15,47 @@ async function readProfileJson(profilePath) {
   }
 }
 
-const jobId = argValue("--job", "");
-const profileName = argValue("--profile", "default");
-const submitPublish = process.argv.includes("--submit-publish");
-
-if (!jobId) {
-  console.error("Usage: publish-wechat --job <job_id> [--profile default] [--submit-publish]");
-  process.exit(2);
+function assertProfileObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return { ...value };
+  throw new CliInputError("Profile JSON must be an object");
 }
 
-const root = process.cwd();
-const profilePath = join(root, "profiles", `${profileName}.json`);
-const profileJson = await readProfileJson(profilePath);
-profileJson.submit_publish = submitPublish;
+async function main() {
+  const options = parseCliOptions(process.argv.slice(2), process.cwd());
+  const profileJson = assertProfileObject(await readProfileJson(options.profilePath));
+  if (options.submitPublish) profileJson.submit_publish = true;
+  if (options.forceNewDraft) profileJson.force_new_draft = true;
 
-const profile = await loadProfile({ accountProfile: profileName, env: process.env, profileJson });
-const appId = process.env[profile.appIdEnv];
-const appSecret = process.env[profile.appSecretEnv];
-if (!appId || !appSecret) {
-  console.error(`Missing credentials in ${profile.appIdEnv} or ${profile.appSecretEnv}`);
-  process.exit(2);
+  const profile = await loadProfile({ accountProfile: options.profileName, env: process.env, profileJson });
+  const appId = process.env[profile.appIdEnv];
+  const appSecret = process.env[profile.appSecretEnv];
+  if (!appId || !appSecret) {
+    throw new CliInputError(`Missing credentials in ${profile.appIdEnv} or ${profile.appSecretEnv}`);
+  }
+
+  const client = new WechatClient({
+    http: new FetchHttpClient(),
+    appId,
+    appSecret
+  });
+
+  const ledger = await runPublishJob({
+    bundleRoot: options.bundleRoot,
+    runtimeRoot: options.runtimeRoot,
+    profile,
+    client
+  });
+
+  console.log(JSON.stringify({
+    status: ledger.status,
+    draftMediaId: ledger.draftMediaId,
+    publishId: ledger.publishId,
+    articleUrl: ledger.articleUrl
+  }, null, 2));
 }
 
-const client = new WechatClient({
-  http: new FetchHttpClient(),
-  appId,
-  appSecret
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(message);
+  process.exit(error instanceof CliInputError ? 2 : 1);
 });
-
-const ledger = await runPublishJob({
-  bundleRoot: join(root, "imports", jobId),
-  runtimeRoot: join(root, "runtime"),
-  profile,
-  client
-});
-
-console.log(JSON.stringify({
-  status: ledger.status,
-  draftMediaId: ledger.draftMediaId,
-  publishId: ledger.publishId,
-  articleUrl: ledger.articleUrl
-}, null, 2));

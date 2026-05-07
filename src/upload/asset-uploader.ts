@@ -24,8 +24,10 @@ export function toBundleUrlPath(bundleRoot: string, assetPath: string): string {
 export async function uploadAssets(input: {
   bundle: PublishBundle;
   client: UploadClient;
+  assetMap?: AssetUploadMapEntry[];
+  imageUrlMap?: Map<string, string>;
 }): Promise<UploadAssetsResult> {
-  const assetMap: AssetUploadMapEntry[] = [];
+  const assetMap = input.assetMap ?? [];
   const coverSha256 = await sha256File(input.bundle.coverPath);
   const coverMediaId = await input.client.uploadPermanentImage(input.bundle.coverPath);
   assetMap.push({
@@ -35,7 +37,7 @@ export async function uploadAssets(input: {
     mediaId: coverMediaId
   });
 
-  const imageUrlMap = new Map<string, string>();
+  const imageUrlMap = input.imageUrlMap ?? new Map<string, string>();
   for (const assetPath of input.bundle.assetPaths) {
     const bundleRelativePath = toBundleUrlPath(input.bundle.bundleRoot, assetPath);
     const assetSha256 = await sha256File(assetPath);
