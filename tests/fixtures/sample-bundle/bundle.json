@@ -1,0 +1,14 @@
+{
+  "job_id": "JOB-001",
+  "object_id": "DRPUB-026",
+  "title": "AI 越强，个人越不能只追工具",
+  "author": "CLngs",
+  "digest": "工具会追平，真正耐用的是资料、语境、判断和复核流程。",
+  "article_html": "article.html",
+  "article_md": "article.md",
+  "cover_path": "cover/cover.png",
+  "asset_paths": ["assets/body.png"],
+  "source_bundle_hash": "source-hash-001",
+  "platform": "wechat",
+  "publish_mode": "draft_and_publish"
+}
