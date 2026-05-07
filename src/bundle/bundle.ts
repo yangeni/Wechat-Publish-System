@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { readFile, realpath } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import { z } from "zod";
 import type { PublishBundle } from "../domain/types.js";
 
@@ -18,24 +18,33 @@ const BundleSchema = z.object({
   publish_mode: z.enum(["draft_only", "draft_and_publish"]).default("draft_only")
 });
 
-function resolveBundlePath(bundleRoot: string, bundlePath: string): string {
+async function resolveBundlePath(realBundleRoot: string, bundlePath: string): Promise<string> {
   if (isAbsolute(bundlePath)) {
     throw new Error(`Bundle path must be relative: ${bundlePath}`);
   }
 
-  const resolvedBundleRoot = resolve(bundleRoot);
-  const resolvedPath = resolve(resolvedBundleRoot, bundlePath);
-  const relativePath = relative(resolvedBundleRoot, resolvedPath);
+  const resolvedPath = resolve(realBundleRoot, bundlePath);
+  const relativePath = relative(realBundleRoot, resolvedPath);
 
-  if (relativePath.split(sep)[0] === "..") {
+  if (!isPathInsideRoot(relativePath)) {
     throw new Error(`Bundle path escapes bundle root: ${bundlePath}`);
   }
 
-  return resolvedPath;
+  const realPath = await realpath(resolvedPath);
+  const realRelativePath = relative(realBundleRoot, realPath);
+  if (!isPathInsideRoot(realRelativePath)) {
+    throw new Error(`Bundle path resolves outside bundle root: ${bundlePath}`);
+  }
+
+  return realPath;
+}
+
+function isPathInsideRoot(relativePath: string): boolean {
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
 }
 
 export async function readBundle(bundleRoot: string): Promise<PublishBundle> {
-  const resolvedBundleRoot = resolve(bundleRoot);
+  const resolvedBundleRoot = await realpath(resolve(bundleRoot));
   const raw = JSON.parse(await readFile(resolve(resolvedBundleRoot, "bundle.json"), "utf8"));
   const parsed = BundleSchema.parse(raw);
   return {
@@ -44,10 +53,10 @@ export async function readBundle(bundleRoot: string): Promise<PublishBundle> {
     title: parsed.title,
     author: parsed.author,
     digest: parsed.digest,
-    articleHtmlPath: resolveBundlePath(resolvedBundleRoot, parsed.article_html),
-    articleMarkdownPath: resolveBundlePath(resolvedBundleRoot, parsed.article_md),
-    coverPath: resolveBundlePath(resolvedBundleRoot, parsed.cover_path),
-    assetPaths: parsed.asset_paths.map((assetPath) => resolveBundlePath(resolvedBundleRoot, assetPath)),
+    articleHtmlPath: await resolveBundlePath(resolvedBundleRoot, parsed.article_html),
+    articleMarkdownPath: await resolveBundlePath(resolvedBundleRoot, parsed.article_md),
+    coverPath: await resolveBundlePath(resolvedBundleRoot, parsed.cover_path),
+    assetPaths: await Promise.all(parsed.asset_paths.map((assetPath) => resolveBundlePath(resolvedBundleRoot, assetPath))),
     sourceBundleHash: parsed.source_bundle_hash,
     platform: parsed.platform,
     publishMode: parsed.publish_mode,

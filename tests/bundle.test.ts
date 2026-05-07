@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { join } from "node:path";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { readBundle } from "../src/bundle/bundle.js";
 
@@ -34,5 +34,28 @@ describe("readBundle", () => {
     );
 
     await expect(readBundle(root)).rejects.toThrow();
+  });
+
+  it("rejects symlinked bundle files that resolve outside the bundle root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "wechat-bundle-"));
+    const outside = await mkdtemp(join(tmpdir(), "wechat-outside-"));
+    await writeFile(join(outside, "article.html"), "<article>outside</article>", "utf8");
+    await symlink(join(outside, "article.html"), join(root, "article.html"));
+    await writeFile(
+      join(root, "bundle.json"),
+      JSON.stringify({
+        job_id: "JOB-003",
+        object_id: "DRPUB-028",
+        title: "Symlink bundle",
+        article_html: "article.html",
+        article_md: "article.md",
+        cover_path: "cover.png",
+        asset_paths: [],
+        platform: "wechat"
+      }),
+      "utf8"
+    );
+
+    await expect(readBundle(root)).rejects.toThrow("resolves outside bundle root");
   });
 });
