@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { basename, join } from "node:path";
-import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createLedgerPaths } from "../src/ledger/ledger.js";
-import { parseCliOptions } from "../src/publish/cli-options.js";
+import { parseCliOptions, validateCliBundleRoot } from "../src/publish/cli-options.js";
 import { type PublishClient, runPublishJob } from "../src/publish/orchestrator.js";
 import type { PublishLedger, PublishProfile } from "../src/domain/types.js";
 
@@ -161,6 +161,71 @@ describe("runPublishJob", () => {
     expect(result.articleUrl).toBe("https://mp.weixin.qq.com/s/article");
     expect(calls).toEqual(["uploadPermanentImage", "uploadArticleImage", "addDraft", "submitPublish", "getPublishStatus"]);
   });
+
+  it("polls publish status until it reaches a terminal result", async () => {
+    const root = await runtimeRoot();
+    const statuses = [1, 0];
+    const calls: string[] = [];
+    const result = await runPublishJob({
+      bundleRoot: sampleBundleRoot,
+      runtimeRoot: root,
+      profile: profile({ submitPublish: true, pollIntervalSeconds: 0.001 }),
+      client: client(calls, {
+        async getPublishStatus() {
+          calls.push("getPublishStatus");
+          return { publish_status: statuses.shift() ?? 0 };
+        }
+      })
+    });
+
+    expect(result.status).toBe("published");
+    expect(calls).toEqual([
+      "uploadPermanentImage",
+      "uploadArticleImage",
+      "addDraft",
+      "submitPublish",
+      "getPublishStatus",
+      "getPublishStatus"
+    ]);
+  });
+
+  it("preserves draft and publish ids when status polling fails", async () => {
+    const root = await runtimeRoot();
+    await expect(runPublishJob({
+      bundleRoot: sampleBundleRoot,
+      runtimeRoot: root,
+      profile: profile({ submitPublish: true }),
+      client: client([], {
+        async getPublishStatus() {
+          throw new Error("status failed");
+        }
+      })
+    })).rejects.toThrow("status failed");
+
+    const ledger = await readLedger(root);
+    expect(ledger.status).toBe("failed");
+    expect(ledger.draftMediaId).toBe("DRAFT_MEDIA_ID");
+    expect(ledger.publishId).toBe("PUB_ID");
+  });
+
+  it("rejects a bundle whose job id does not match the requested job", async () => {
+    const root = await runtimeRoot();
+    const bundleRoot = await copiedBundleRoot();
+    const raw = JSON.parse(await readFile(join(bundleRoot, "bundle.json"), "utf8"));
+    raw.job_id = "OTHER-JOB";
+    await writeFile(join(bundleRoot, "bundle.json"), JSON.stringify(raw), "utf8");
+    const calls: string[] = [];
+
+    await expect(runPublishJob({
+      bundleRoot,
+      runtimeRoot: root,
+      expectedJobId: "JOB-001",
+      profile: profile(),
+      client: client(calls)
+    })).rejects.toThrow("does not match requested job");
+
+    expect(calls).toEqual([]);
+  });
 });
 
 describe("parseCliOptions", () => {
@@ -196,5 +261,15 @@ describe("parseCliOptions", () => {
 
   it("rejects mismatched job and bundle directory", () => {
     expect(() => parseCliOptions(["--job", "JOB-001", "--bundle", "imports/JOB-002"], "/workspace")).toThrow("must match");
+  });
+
+  it("rejects bundle directories that resolve outside imports", async () => {
+    const root = await mkdtemp(join(tmpdir(), "wechat-cli-"));
+    const outside = await mkdtemp(join(tmpdir(), "wechat-outside-"));
+    await mkdir(join(root, "imports"), { recursive: true });
+    await symlink(outside, join(root, "imports", "JOB-001"));
+    const options = parseCliOptions(["--job", "JOB-001"], root);
+
+    await expect(validateCliBundleRoot(options)).rejects.toThrow("Bundle path must stay inside imports/<job_id>");
   });
 });

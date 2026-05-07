@@ -4,7 +4,7 @@ import { FetchHttpClient } from "../dist/src/wechat/http.js";
 import { WechatClient } from "../dist/src/wechat/client.js";
 import { loadProfile } from "../dist/src/profile/profile.js";
 import { runPublishJob } from "../dist/src/publish/orchestrator.js";
-import { CliInputError, parseCliOptions } from "../dist/src/publish/cli-options.js";
+import { CliInputError, parseCliOptions, validateCliBundleRoot } from "../dist/src/publish/cli-options.js";
 
 async function readProfileJson(profilePath) {
   try {
@@ -22,6 +22,7 @@ function assertProfileObject(value) {
 
 async function main() {
   const options = parseCliOptions(process.argv.slice(2), process.cwd());
+  await validateCliBundleRoot(options);
   const profileJson = assertProfileObject(await readProfileJson(options.profilePath));
   if (options.submitPublish) profileJson.submit_publish = true;
   if (options.forceNewDraft) profileJson.force_new_draft = true;
@@ -42,6 +43,7 @@ async function main() {
   const ledger = await runPublishJob({
     bundleRoot: options.bundleRoot,
     runtimeRoot: options.runtimeRoot,
+    expectedJobId: options.jobId,
     profile,
     client
   });

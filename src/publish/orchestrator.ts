@@ -16,6 +16,7 @@ export interface PublishClient extends UploadClient {
 export interface RunPublishJobInput {
   bundleRoot: string;
   runtimeRoot: string;
+  expectedJobId?: string;
   profile: PublishProfile;
   client: PublishClient;
 }
@@ -25,6 +26,9 @@ class BlockedContentError extends Error {}
 export async function runPublishJob(input: RunPublishJobInput): Promise<PublishLedger> {
   const startedAt = new Date().toISOString();
   const bundle = await readBundle(input.bundleRoot);
+  if (input.expectedJobId && bundle.jobId !== input.expectedJobId) {
+    throw new Error(`Bundle job_id (${bundle.jobId}) does not match requested job (${input.expectedJobId})`);
+  }
   const packageHash = await hashFiles([
     bundle.articleHtmlPath,
     bundle.articleMarkdownPath,
@@ -94,7 +98,7 @@ export async function runPublishJob(input: RunPublishJobInput): Promise<PublishL
 
     if (input.profile.submitPublish) {
       publishId = await input.client.submitPublish(draftMediaId);
-      const publishResult = await input.client.getPublishStatus(publishId);
+      const publishResult = await pollPublishStatus(input.client, publishId, input.profile);
       publishStatus = typeof publishResult.publish_status === "number" ? publishResult.publish_status : undefined;
       const detail = publishResult.article_detail as { item?: Array<{ article_url?: string }> } | undefined;
       articleUrl = detail?.item?.[0]?.article_url;
@@ -113,4 +117,26 @@ export async function runPublishJob(input: RunPublishJobInput): Promise<PublishL
     }
     throw error;
   }
+}
+
+async function pollPublishStatus(
+  client: PublishClient,
+  publishId: string,
+  profile: PublishProfile
+): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + profile.pollTimeoutSeconds * 1000;
+  const intervalMs = profile.pollIntervalSeconds * 1000;
+
+  for (;;) {
+    const publishResult = await client.getPublishStatus(publishId);
+    const publishStatus = publishResult.publish_status;
+    if (publishStatus !== 1 || Date.now() >= deadline) return publishResult;
+
+    await sleep(Math.min(intervalMs, Math.max(0, deadline - Date.now())));
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }

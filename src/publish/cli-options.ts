@@ -1,3 +1,4 @@
+import { realpath } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
 export class CliInputError extends Error {}
@@ -85,6 +86,23 @@ export function parseCliOptions(args: string[], root: string): CliOptions {
     submitPublish,
     forceNewDraft
   };
+}
+
+export async function validateCliBundleRoot(options: CliOptions): Promise<void> {
+  let realImportsRoot: string;
+  let realBundleRoot: string;
+  try {
+    [realImportsRoot, realBundleRoot] = await Promise.all([
+      realpath(resolve(options.root, "imports")),
+      realpath(options.bundleRoot)
+    ]);
+  } catch {
+    throw new CliInputError(`Bundle path does not exist: ${options.bundleRoot}`);
+  }
+
+  if (dirname(realBundleRoot) !== realImportsRoot || basename(realBundleRoot) !== options.jobId) {
+    throw new CliInputError("Bundle path must stay inside imports/<job_id>");
+  }
 }
 
 function assertSafeName(value: string, label: string): string {
