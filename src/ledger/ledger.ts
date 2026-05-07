@@ -62,7 +62,8 @@ export async function existingLedgerForKey(runtimeRoot: string, idempotencyKey: 
 }
 
 function assertSafeJobId(jobId: string): void {
-  if (jobId.trim() === "" || jobId.includes("/") || jobId.includes("\\") || jobId.includes("..")) {
+  const trimmed = jobId.trim();
+  if (trimmed === "" || trimmed === "." || trimmed === ".." || trimmed.includes("/") || trimmed.includes("\\") || trimmed.includes("..")) {
     throw new Error(`Unsafe ledger job id: ${jobId}`);
   }
 }
@@ -75,6 +76,7 @@ function isPublishLedger(value: unknown): value is PublishLedger {
     && typeof value.packageHash === "string"
     && typeof value.idempotencyKey === "string"
     && typeof value.startedAt === "string"
+    && (value.finishedAt === undefined || typeof value.finishedAt === "string")
     && typeof value.status === "string"
     && ledgerStatuses.has(value.status)
     && Array.isArray(value.assetMap);

@@ -47,6 +47,38 @@ describe("ledger", () => {
   it("rejects unsafe job ids", async () => {
     const root = await mkdtemp(join(tmpdir(), "wechat-ledger-"));
     expect(() => createLedgerPaths(root, "../../escape")).toThrow();
+    expect(() => createLedgerPaths(root, ".")).toThrow();
+  });
+
+  it("skips malformed duplicate ledgers with non-string finishedAt", async () => {
+    const root = await mkdtemp(join(tmpdir(), "wechat-ledger-"));
+    await writeLedger(createLedgerPaths(root, "VALID"), {
+      jobId: "VALID",
+      objectId: "DRPUB-026",
+      accountProfile: "default",
+      packageHash: "hash",
+      idempotencyKey: "DRPUB-026:hash:default",
+      draftMediaId: "VALID_DRAFT_MEDIA_ID",
+      assetMap: [],
+      startedAt: "2026-05-07T00:00:00.000Z",
+      status: "draft_saved"
+    });
+    const badJobDir = join(root, "publish-jobs", "BAD");
+    await mkdir(badJobDir, { recursive: true });
+    await writeFile(join(badJobDir, "publish-ledger.json"), JSON.stringify({
+      jobId: "BAD",
+      objectId: "DRPUB-026",
+      accountProfile: "default",
+      packageHash: "hash",
+      idempotencyKey: "DRPUB-026:hash:default",
+      assetMap: [],
+      startedAt: "2026-05-07T00:00:01.000Z",
+      finishedAt: 123,
+      status: "draft_saved"
+    }), "utf8");
+
+    const existing = await existingLedgerForKey(root, "DRPUB-026:hash:default");
+    expect(existing?.draftMediaId).toBe("VALID_DRAFT_MEDIA_ID");
   });
 
   it("returns newest valid ledger when duplicate idempotency keys exist", async () => {
