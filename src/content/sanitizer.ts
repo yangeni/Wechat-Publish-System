@@ -17,7 +17,7 @@ function isLocalAbsolutePath(value: string): boolean {
 }
 
 function isUnsafeUrl(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
+  const normalized = value.trim().toLowerCase().replace(/[\u0000-\u001f\u007f\s]+/g, "");
   return normalized.startsWith("javascript:") || normalized.startsWith("data:");
 }
 

@@ -41,6 +41,15 @@ describe("sanitizeWechatHtml", () => {
     expect(result.html).not.toContain("onerror=");
   });
 
+  it("removes obfuscated executable URL attributes", () => {
+    const result = sanitizeWechatHtml({
+      html: '<article><a href="java&#x0A;script:alert(1)">bad</a></article>',
+      imageUrlMap: new Map()
+    });
+    expect(result.blockers.some((blocker) => blocker.startsWith("unsafe_url:href:java") && blocker.includes("script:alert(1)"))).toBe(true);
+    expect(result.html).not.toMatch(/href="java\s*script:alert\(1\)"/i);
+  });
+
   it("does not block Gate inside normal prose words", () => {
     const result = sanitizeWechatHtml({
       html: "<article><p>Bill Gates wrote about the gateway market.</p></article>",
