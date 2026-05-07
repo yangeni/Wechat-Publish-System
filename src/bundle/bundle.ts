@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import type { PublishBundle } from "../domain/types.js";
 
@@ -18,8 +18,25 @@ const BundleSchema = z.object({
   publish_mode: z.enum(["draft_only", "draft_and_publish"]).default("draft_only")
 });
 
+function resolveBundlePath(bundleRoot: string, bundlePath: string): string {
+  if (isAbsolute(bundlePath)) {
+    throw new Error(`Bundle path must be relative: ${bundlePath}`);
+  }
+
+  const resolvedBundleRoot = resolve(bundleRoot);
+  const resolvedPath = resolve(resolvedBundleRoot, bundlePath);
+  const relativePath = relative(resolvedBundleRoot, resolvedPath);
+
+  if (relativePath.split(sep)[0] === "..") {
+    throw new Error(`Bundle path escapes bundle root: ${bundlePath}`);
+  }
+
+  return resolvedPath;
+}
+
 export async function readBundle(bundleRoot: string): Promise<PublishBundle> {
-  const raw = JSON.parse(await readFile(join(bundleRoot, "bundle.json"), "utf8"));
+  const resolvedBundleRoot = resolve(bundleRoot);
+  const raw = JSON.parse(await readFile(resolve(resolvedBundleRoot, "bundle.json"), "utf8"));
   const parsed = BundleSchema.parse(raw);
   return {
     jobId: parsed.job_id,
@@ -27,13 +44,13 @@ export async function readBundle(bundleRoot: string): Promise<PublishBundle> {
     title: parsed.title,
     author: parsed.author,
     digest: parsed.digest,
-    articleHtmlPath: join(bundleRoot, parsed.article_html),
-    articleMarkdownPath: join(bundleRoot, parsed.article_md),
-    coverPath: join(bundleRoot, parsed.cover_path),
-    assetPaths: parsed.asset_paths.map((assetPath) => join(bundleRoot, assetPath)),
+    articleHtmlPath: resolveBundlePath(resolvedBundleRoot, parsed.article_html),
+    articleMarkdownPath: resolveBundlePath(resolvedBundleRoot, parsed.article_md),
+    coverPath: resolveBundlePath(resolvedBundleRoot, parsed.cover_path),
+    assetPaths: parsed.asset_paths.map((assetPath) => resolveBundlePath(resolvedBundleRoot, assetPath)),
     sourceBundleHash: parsed.source_bundle_hash,
     platform: parsed.platform,
     publishMode: parsed.publish_mode,
-    bundleRoot
+    bundleRoot: resolvedBundleRoot
   };
 }
