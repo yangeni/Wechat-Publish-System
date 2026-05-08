@@ -1,6 +1,7 @@
 import { access, copyFile, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import * as cheerio from "cheerio";
+import juice from "juice";
 
 export interface ImportRmwWechatInput {
   writerRoot: string;
@@ -43,10 +44,11 @@ export async function importRmwWechatPackage(input: ImportRmwWechatInput): Promi
   const sourceMarkdownPath = resolve(realWechatRoot, "wechat_markdown.md");
   const articleHtmlPath = resolve(bundleRoot, "article.html");
   const articleMarkdownPath = resolve(bundleRoot, "article.md");
-  await copyFile(sourceHtmlPath, articleHtmlPath);
   await copyFile(sourceMarkdownPath, articleMarkdownPath);
 
   const html = await readFile(sourceHtmlPath, "utf8");
+  await writeFile(articleHtmlPath, buildWechatDraftHtml(html), "utf8");
+
   const metadata = extractWechatMetadata(html, input.author ?? "CLngs");
   const imagePaths = extractImagePaths(html);
   if (imagePaths.length === 0) throw new Error("Writer WeChat HTML has no images");
@@ -84,6 +86,37 @@ export async function importRmwWechatPackage(input: ImportRmwWechatInput): Promi
     coverPath: resolve(bundleRoot, coverPath),
     assetPaths: imagePaths.map((assetPath) => resolve(bundleRoot, assetPath))
   };
+}
+
+export function buildWechatDraftHtml(html: string): string {
+  const inlined = juice(html, {
+    applyStyleTags: true,
+    removeStyleTags: true,
+    preserveMediaQueries: false,
+    preserveFontFaces: false,
+    preserveKeyFrames: false,
+    preservePseudos: false,
+    resolveCSSVariables: true
+  });
+  const $ = cheerio.load(inlined);
+  $("script, style, meta, title").remove();
+  $("[style]").each((_, element) => {
+    const style = $(element).attr("style") ?? "";
+    $(element).attr("style", normalizeInlineStyle(style));
+  });
+  const bodyHtml = $("body").html() ?? $.root().html() ?? inlined;
+  return `${bodyHtml.trim()}\n`;
+}
+
+function normalizeInlineStyle(style: string): string {
+  return style
+    .replace(/width:\s*min\(100%,\s*([0-9]+px)\);/g, "width: 100%; max-width: $1;")
+    .replace(/font-size:\s*clamp\((\d+)px,\s*[^,]+,\s*(\d+)px\);/g, (_, min, max) => {
+      const safeSize = Math.round((Number(min) + Number(max)) / 2);
+      return `font-size: ${safeSize}px;`;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function extractWechatMetadata(html: string, author: string): { title: string; author: string; digest: string; coverSrc?: string } {

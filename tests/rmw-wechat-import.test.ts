@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { extractImagePaths, extractWechatMetadata, importRmwWechatPackage } from "../src/import/rmw-wechat.js";
+import { buildWechatDraftHtml, extractImagePaths, extractWechatMetadata, importRmwWechatPackage } from "../src/import/rmw-wechat.js";
 
-const html = `<!doctype html><html><head><title>标题</title></head><body><main><div class="cover"><img src="assets/cover.png"></div><article><p class="deck">摘要内容</p><figure><img src="assets/body.png"></figure></article></main></body></html>`;
+const html = `<!doctype html><html><head><title>标题</title><style>.deck{color:#536f7c;font-size:clamp(17px,3vw,21px)}.cover{border-radius:22px;width:min(100%,860px)}</style></head><body><main><div class="cover"><img src="assets/cover.png"></div><article><p class="deck">摘要内容</p><figure><img src="assets/body.png"></figure></article></main></body></html>`;
 
 describe("RMW WeChat importer", () => {
   it("extracts metadata and relative image paths", () => {
@@ -15,6 +15,16 @@ describe("RMW WeChat importer", () => {
       coverSrc: "assets/cover.png"
     });
     expect(extractImagePaths(html)).toEqual(["assets/cover.png", "assets/body.png"]);
+  });
+
+  it("converts preview CSS into inline WeChat draft HTML", () => {
+    const draftHtml = buildWechatDraftHtml(html);
+    expect(draftHtml).not.toContain("<style");
+    expect(draftHtml).not.toContain("<title");
+    expect(draftHtml).toContain("style=");
+    expect(draftHtml).toContain("color: #536f7c");
+    expect(draftHtml).not.toContain("clamp(");
+    expect(draftHtml).not.toContain("min(100%");
   });
 
   it("imports a Writer WeChat package into publisher bundle format", async () => {
@@ -40,6 +50,8 @@ describe("RMW WeChat importer", () => {
       platform: "wechat",
       publish_mode: "draft_only"
     });
+    const articleHtml = await readFile(join(result.bundleRoot, "article.html"), "utf8");
+    expect(articleHtml).toContain("style=");
     expect(await readFile(join(result.bundleRoot, "assets/body.png"), "utf8")).toBe("body");
   });
 });
