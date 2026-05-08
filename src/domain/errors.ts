@@ -1,6 +1,6 @@
 import type { ClassifiedError, WechatApiErrorLike } from "./types.js";
 
-const AUTH_CODES = new Set([40001, 40014, 40164, 48001]);
+const AUTH_CODES = new Set([40001, 40014, 40125, 40164, 48001]);
 const CONTENT_CODES = new Set([40005, 40007, 40009, 53503, 53504, 53505]);
 const RETRYABLE_CODES = new Set([-1, 45009, 50001]);
 

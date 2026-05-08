@@ -16,6 +16,7 @@ describe("domain helpers", () => {
 
   it("classifies auth and content failures", () => {
     expect(classifyWechatError({ errcode: 48001, errmsg: "api unauthorized" }).kind).toBe("BLOCKED_AUTH");
+    expect(classifyWechatError({ errcode: 40125, errmsg: "invalid appsecret" }).kind).toBe("BLOCKED_AUTH");
     expect(classifyWechatError({ errcode: 40009, errmsg: "invalid image size" }).kind).toBe("BLOCKED_CONTENT");
     expect(classifyWechatError({ errcode: 0, errmsg: "ok" }).kind).toBe("OK");
   });
