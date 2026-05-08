@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "publish-wechat": "./bin/publish-wechat.mjs",
-    "check-wechat-account": "./bin/check-wechat-account.mjs"
+    "check-wechat-account": "./bin/check-wechat-account.mjs",
+    "import-rmw-wechat": "./bin/import-rmw-wechat.mjs"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -13,7 +14,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "check": "npm run typecheck && npm test && npm run build",
-    "account:check": "npm run build && ./bin/check-wechat-account.mjs"
+    "account:check": "npm run build && ./bin/check-wechat-account.mjs",
+    "writer:import": "npm run build && ./bin/import-rmw-wechat.mjs"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

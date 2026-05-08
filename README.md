@@ -31,6 +31,23 @@ imports/<job_id>/
 
 All paths inside `bundle.json` are resolved relative to the bundle root.
 
+## Writer Handoff
+
+Import an existing Research Media Writer WeChat package into this workspace:
+
+```bash
+npm run writer:import -- --writer-root /path/to/research-media-writer-v3 --object DRPUB-026 --force
+```
+
+Then create a WeChat draft:
+
+```bash
+npm run build
+./bin/publish-wechat.mjs --job DRPUB-026 --profile default
+```
+
+The import command copies only the Writer WeChat package files into `imports/<job_id>/`. It does not call WeChat APIs.
+
 ## Credentials
 
 Profiles name environment variables. Secrets stay outside runtime records.
