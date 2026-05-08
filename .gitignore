@@ -4,5 +4,6 @@ dist/
 coverage/
 .env.local
 runtime/
+imports/
 profiles/*.local.json
 profiles/*.secret.json
