@@ -35,12 +35,31 @@ All paths inside `bundle.json` are resolved relative to the bundle root.
 
 Profiles name environment variables. Secrets stay outside runtime records.
 
-Default environment variable names:
+The default profile uses these names:
 
 ```text
 WECHAT_MP_APP_ID
 WECHAT_MP_APP_SECRET
 ```
+
+Set them in your shell, or put them in a local ignored `.env.local` file:
+
+```text
+WECHAT_MP_APP_ID=wx...
+WECHAT_MP_APP_SECRET=...
+```
+
+Check account connectivity without uploading assets or creating drafts:
+
+```bash
+npm run account:check
+```
+
+The check only requests an access token and does not print the token or secret.
+
+## Profiles
+
+The default tracked profile is `profiles/default.json`. It names the credential environment variables and keeps `submit_publish` disabled.
 
 ## Runtime Records
 

@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "bin": {
-    "publish-wechat": "./bin/publish-wechat.mjs"
+    "publish-wechat": "./bin/publish-wechat.mjs",
+    "check-wechat-account": "./bin/check-wechat-account.mjs"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "account:check": "npm run build && ./bin/check-wechat-account.mjs"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

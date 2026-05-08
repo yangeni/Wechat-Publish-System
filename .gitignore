@@ -2,6 +2,7 @@
 node_modules/
 dist/
 coverage/
+.env.local
 runtime/
 profiles/*.local.json
 profiles/*.secret.json

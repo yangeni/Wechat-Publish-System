@@ -4,6 +4,7 @@ import { FetchHttpClient } from "../dist/src/wechat/http.js";
 import { WechatClient } from "../dist/src/wechat/client.js";
 import { loadProfile } from "../dist/src/profile/profile.js";
 import { runPublishJob } from "../dist/src/publish/orchestrator.js";
+import { loadRuntimeEnv } from "../dist/src/profile/local-env.js";
 import { CliInputError, parseCliOptions, validateCliBundleRoot } from "../dist/src/publish/cli-options.js";
 
 async function readProfileJson(profilePath) {
@@ -26,10 +27,11 @@ async function main() {
   const profileJson = assertProfileObject(await readProfileJson(options.profilePath));
   if (options.submitPublish) profileJson.submit_publish = true;
   if (options.forceNewDraft) profileJson.force_new_draft = true;
+  const runtimeEnv = await loadRuntimeEnv(options.root, process.env);
 
-  const profile = await loadProfile({ accountProfile: options.profileName, env: process.env, profileJson });
-  const appId = process.env[profile.appIdEnv];
-  const appSecret = process.env[profile.appSecretEnv];
+  const profile = await loadProfile({ accountProfile: options.profileName, env: runtimeEnv, profileJson });
+  const appId = runtimeEnv[profile.appIdEnv];
+  const appSecret = runtimeEnv[profile.appSecretEnv];
   if (!appId || !appSecret) {
     throw new CliInputError(`Missing credentials in ${profile.appIdEnv} or ${profile.appSecretEnv}`);
   }
