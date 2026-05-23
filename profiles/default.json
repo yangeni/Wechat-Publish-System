@@ -1,0 +1,11 @@
+{
+  "app_id_env": "WECHAT_MP_APP_ID",
+  "app_secret_env": "WECHAT_MP_APP_SECRET",
+  "submit_publish": false,
+  "force_new_draft": false,
+  "poll_timeout_seconds": 120,
+  "poll_interval_seconds": 5,
+  "default_author": "",
+  "need_open_comment": 0,
+  "only_fans_can_comment": 0
+}
